@@ -1,0 +1,15 @@
+{
+  "name": "e-library",
+  "version": "1.0.0",
+  "description": "The asepProject content for the backend",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "backend",
+    "server"
+  ],
+  "author": "",
+  "license": "ISC"
+}
