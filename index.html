@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Widevine DRM Player</title>
+  <script src="https://ajax.googleapis.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
+  <style>
+    body {
+      background-color: #000;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    video {
+      width: 80%;
+      height: auto;
+      background-color: #000;
+    }
+  </style>
+</head>
+<body>
+  <video id="video" autoplay controls></video>
+
+  <script>
+    async function initPlayer() {
+      const video = document.getElementById('video');
+      const player = new shaka.Player(video);
+
+      player.addEventListener('error', onErrorEvent);
+
+      try {
+        await player.configure({
+          drm: {
+            clearKeys: {
+              'fe7718fbb3fb4ba78c07cc0f578744e6': '624e24b1843b459fab0a949609416f0d'
+            }
+          }
+        });
+
+        player.getNetworkingEngine().registerRequestFilter(function(type, request) {
+          if (type === shaka.net.NetworkingEngine.RequestType.MANIFEST ||
+              type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
+            request.headers['Cookie'] = 'hdntl=exp=1748357301~acl=*sshindi*~id=af700ec1beaeb7452b21f62a28510fa1~data=hdntl~hmac=918ebcdceb8db83257b7a85d961181a3eff486b5e54501471c0a5d73e5621ffe';
+            request.headers['User-Agent'] = 'Hotstar;in.startv.hotstar/25.02.24.8.11169 (Android/15)';
+          }
+        });
+
+        await player.load('https://livetv-push.hotstar.com/dash/live/2002466-b/sshindiwv/master.mpd');
+        console.log('The video has been loaded!');
+      } catch (e) {
+        onError(e);
+      }
+    }
+
+    function onErrorEvent(event) {
+      onError(event.detail);
+    }
+
+    function onError(error) {
+      console.error('Error code', error.code, 'object', error);
+    }
+
+    shaka.polyfill.installAll();
+    if (shaka.Player.isBrowserSupported()) {
+      initPlayer();
+    } else {
+      console.error('Browser not supported!');
+    }
+  </script>
+</body>
+</html>
