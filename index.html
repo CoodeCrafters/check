@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Widevine DRM Player</title>
+  <title>ClearKey DRM Video Player</title>
   <script src="https://ajax.googleapis.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
   <style>
     body {
@@ -16,13 +16,14 @@
     }
     video {
       width: 80%;
-      height: auto;
+      max-height: 90vh;
       background-color: #000;
+      border-radius: 12px;
     }
   </style>
 </head>
 <body>
-  <video id="video" autoplay controls></video>
+  <video id="video" controls autoplay></video>
 
   <script>
     async function initPlayer() {
@@ -35,23 +36,15 @@
         await player.configure({
           drm: {
             clearKeys: {
-              'fe7718fbb3fb4ba78c07cc0f578744e6': '624e24b1843b459fab0a949609416f0d'
+              'ba006865de93a502ed728a89ad18f335': 'cd4dc2572233afb5b7891174d32b4ad7'
             }
           }
         });
 
-        player.getNetworkingEngine().registerRequestFilter(function(type, request) {
-          if (type === shaka.net.NetworkingEngine.RequestType.MANIFEST ||
-              type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
-            request.headers['Cookie'] = 'hdntl=exp=1748357301~acl=*sshindi*~id=af700ec1beaeb7452b21f62a28510fa1~data=hdntl~hmac=918ebcdceb8db83257b7a85d961181a3eff486b5e54501471c0a5d73e5621ffe';
-            request.headers['User-Agent'] = 'Hotstar;in.startv.hotstar/25.02.24.8.11169 (Android/15)';
-          }
-        });
-
-        await player.load('https://livetv-push.hotstar.com/dash/live/2002466-b/sshindiwv/master.mpd');
-        console.log('The video has been loaded!');
-      } catch (e) {
-        onError(e);
+        await player.load('https://ottb.live.cf.ww.aiv-cdn.net/lhr-nitro/live/clients/dash/enc/jo0qxpbys1/out/v1/9bbaca20b4b74991acce1815673cf4c9/cenc.mpd');
+        console.log('The video has been loaded successfully!');
+      } catch (error) {
+        onError(error);
       }
     }
 
