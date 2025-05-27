@@ -1,67 +1,126 @@
-<!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>ClearKey DRM Video Player</title>
-  <script src="https://ajax.googleapis.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
+<!-- for non-UI builds: -->
+<script src="https://ajax.googleapis.com/ajax/libs/shaka-player/3.2.0/shaka-player.compiled.js"></script>
+<!-- or, for UI builds: -->
+<script src="https://ajax.googleapis.com/ajax/libs/shaka-player/3.2.0/shaka-player.ui.js"></script>
+<link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/shaka-player/3.2.0/controls.css">
   <style>
     body {
-      background-color: #000;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
+        width:100%;
+        height: 100%;
+        font-family: Poppins;
+        display:block;
+        position: absolute;
+        padding: 0px;
+        margin: 0px;
+        background: #000;
     }
-    video {
-      width: 80%;
-      max-height: 90vh;
-      background-color: #000;
-      border-radius: 12px;
+    video{
+        width:100%;
+        height: 100%;
+        display:inline-block;
+        -webkit-user-select:none;
+        -moz-user-select:none;
+        -ms-user-select:none;
+        user-select:none;
     }
-  </style>
+ a, a:hover, a:focus, a:active {
+      text-decoration: none;
+ }
+
+</style>
+    <style>
+        div a img{visibility:hidden;}
+body::before {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        z-index: 10;
+        content: '';
+        height: 70px;
+        width: 110px;
+        background: url(' ') no-repeat;
+        background-size: 110px auto, auto;
+        opacity: 0.4;
+    }
+</style>
 </head>
 <body>
-  <video id="video" controls autoplay></video>
+<center>   <div data-shaka-player-container style="max-width:40em"
+         data-shaka-player-cast-receiver-id="1BA79154">
+       <!-- The data-shaka-player tag will make the UI library use this video element.
+            If no video is provided, the UI will automatically make one inside the container div. -->
+         
+        <video autoplay data-shaka-player id="video" poster="" style="width:100%;height:100%"></video>
+    </div>
+    </div></center>
+<script>
 
-  <script>
-    async function initPlayer() {
-      const video = document.getElementById('video');
-      const player = new shaka.Player(video);
+const manifestUri =
+    'https://ottb.live.cf.ww.aiv-cdn.net/lhr-nitro/live/clients/dash/enc/jo0qxpbys1/out/v1/9bbaca20b4b74991acce1815673cf4c9/cenc.mpd';
 
-      player.addEventListener('error', onErrorEvent);
+async function init() {
+  // When using the UI, the player is made automatically by the UI object.
+  const video = document.getElementById('video');
+  const ui = video['ui'];
+  const controls = ui.getControls();
+  const player = controls.getPlayer();
 
-      try {
-        await player.configure({
-          drm: {
-            clearKeys: {
-              'ba006865de93a502ed728a89ad18f335': 'cd4dc2572233afb5b7891174d32b4ad7'
-            }
-          }
-        });
-
-        await player.load('https://ottb.live.cf.ww.aiv-cdn.net/lhr-nitro/live/clients/dash/enc/jo0qxpbys1/out/v1/9bbaca20b4b74991acce1815673cf4c9/cenc.mpd');
-        console.log('The video has been loaded successfully!');
-      } catch (error) {
-        onError(error);
-      }
+player.configure({
+  drm: {
+    clearKeys: {
+      // 'key-id-in-hex': 'key-in-hex',
+      'ba006865de93a502ed728a89ad18f335 ': 'cd4dc2572233afb5b7891174d32b4ad7',
     }
+  }
+});
 
-    function onErrorEvent(event) {
-      onError(event.detail);
-    }
+  // Attach player and ui to the window to make it easy to access in the JS console.
+  window.player = player;
+  window.ui = ui;
 
-    function onError(error) {
-      console.error('Error code', error.code, 'object', error);
-    }
+  // Listen for error events.
+  player.addEventListener('error', onPlayerErrorEvent);
+  controls.addEventListener('error', onUIErrorEvent);
 
-    shaka.polyfill.installAll();
-    if (shaka.Player.isBrowserSupported()) {
-      initPlayer();
-    } else {
-      console.error('Browser not supported!');
-    }
-  </script>
+  // Try to load a manifest.
+  // This is an asynchronous process.
+  try {
+    await player.load(manifestUri);
+    // This runs if the asynchronous load is successful.
+    console.log('The video has now been loaded!');
+  } catch (error) {
+    onPlayerError(error);
+  }
+}
+
+function onPlayerErrorEvent(errorEvent) {
+  // Extract the shaka.util.Error object from the event.
+  onPlayerError(event.detail);
+}
+
+function onPlayerError(error) {
+  // Handle player error
+  console.error('Error code', error.code, 'object', error);
+}
+
+function onUIErrorEvent(errorEvent) {
+  // Extract the shaka.util.Error object from the event.
+  onPlayerError(event.detail);
+}
+
+function initFailed(errorEvent) {
+  // Handle the failure to load; errorEvent.detail.reasonCode has a
+  // shaka.ui.FailReasonCode describing why.
+  console.error('Unable to load the UI library!');
+}
+
+// Listen to the custom shaka-ui-loaded event, to wait until the UI is loaded.
+document.addEventListener('shaka-ui-loaded', init);
+// Listen to the custom shaka-ui-load-failed event, in case Shaka Player fails
+// to load (e.g. due to lack of browser support).
+document.addEventListener('shaka-ui-load-failed', initFailed);
+   </script>
 </body>
 </html>
