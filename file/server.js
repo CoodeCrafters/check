@@ -3,20 +3,15 @@ const express = require('express');
 const multer = require('multer');
 const axios = require('axios');
 const cron = require('node-cron');
-const fs = require('fs');
-const path = require('path');
+const cors = require('cors');
 
 const app = express();
-
-const cors = require('cors');
 
 const allowedOrigin = 'https://coodecrafters.github.io';
 
 app.use(cors({
   origin: function(origin, callback) {
-    // Allow requests with no origin (like curl or Postman)
     if (!origin) return callback(null, true);
-
     if (origin === allowedOrigin) {
       callback(null, true);
     } else {
@@ -25,12 +20,8 @@ app.use(cors({
   }
 }));
 
-// Ensure temp directory exists
-const tempDir = path.join(__dirname, 'temp');
-if (!fs.existsSync(tempDir)) {
-  fs.mkdirSync(tempDir);
-}
-const upload = multer({ dest: tempDir });
+// Use multer.memoryStorage to store file buffer in memory (not on disk)
+const upload = multer({ storage: multer.memoryStorage() });
 
 // Validate required environment variables
 const requiredEnvVars = ['GITHUB_TOKEN', 'GITHUB_OWNER', 'GITHUB_REPO', 'RENDER_ENDPOINT'];
@@ -56,21 +47,19 @@ app.post('/upload', upload.single('resume'), async (req, res) => {
       throw new Error('No file uploaded');
     }
 
-    // Read file content as base64
-    const filePath = path.join(__dirname, req.file.path);
-    const fileBuffer = fs.readFileSync(filePath);
-    const fileContentBase64 = fileBuffer.toString('base64');
+    // File is now available in req.file.buffer as a Buffer
+    const fileContentBase64 = req.file.buffer.toString('base64');
 
-    // Prepare path inside repo (you can change this folder)
+    // Prepare path inside repo
     const repoFilePath = `uploads/${Date.now()}_${req.file.originalname}`;
 
-    // Call GitHub API using axios PUT
+    // Call GitHub API using axios PUT to create/update file in repo
     const githubResponse = await axios.put(
       `https://api.github.com/repos/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/contents/${repoFilePath}`,
       {
         message: `Upload ${req.file.originalname}`,
         content: fileContentBase64,
-        branch: process.env.GITHUB_BRANCH || 'main' // default to main if not set
+        branch: process.env.GITHUB_BRANCH || 'main'
       },
       {
         headers: {
@@ -80,9 +69,6 @@ app.post('/upload', upload.single('resume'), async (req, res) => {
         }
       }
     );
-
-    // Cleanup temp file
-    fs.unlinkSync(filePath);
 
     console.log(`✅ Uploaded to GitHub: ${repoFilePath}`);
 
@@ -107,7 +93,7 @@ app.post('/upload', upload.single('resume'), async (req, res) => {
 cron.schedule('*/2 * * * *', async () => {
   try {
     const response = await axios.get(process.env.RENDER_ENDPOINT + '/welcome', {
-      timeout: 5000 // 5 second timeout
+      timeout: 5000
     });
     console.log(`🌐 Successfully pinged ${process.env.RENDER_ENDPOINT} at ${new Date().toISOString()}`);
     console.log(`Response status: ${response.status}`);
