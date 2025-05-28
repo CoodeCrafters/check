@@ -8,6 +8,23 @@ const path = require('path');
 
 const app = express();
 
+const cors = require('cors');
+
+const allowedOrigin = 'https://coodecrafter.github.io';
+
+app.use(cors({
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like curl or Postman)
+    if (!origin) return callback(null, true);
+
+    if (origin === allowedOrigin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+}));
+
 // Ensure temp directory exists
 const tempDir = path.join(__dirname, 'temp');
 if (!fs.existsSync(tempDir)) {
