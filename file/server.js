@@ -10,7 +10,7 @@ const app = express();
 
 const cors = require('cors');
 
-const allowedOrigin = 'https://coodecrafter.github.io';
+const allowedOrigin = 'https://coodecrafters.github.io';
 
 app.use(cors({
   origin: function(origin, callback) {
