@@ -10,9 +10,28 @@ const path = require('path');
 const app = express();
 const upload = multer({ dest: 'temp/' });
 
+// Validate required environment variables
+const requiredEnvVars = ['GITHUB_TOKEN', 'GITHUB_OWNER', 'GITHUB_REPO', 'RENDER_ENDPOINT'];
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    console.error(`❌ Missing required environment variable: ${envVar}`);
+    process.exit(1);
+  }
+}
+
 // GitHub Client Setup
-const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
+const octokit = new Octokit({ 
+  auth: process.env.GITHUB_TOKEN,
+  userAgent: 'render-github-uploader/v1.0'
+});
+
+// --- Health Check Endpoint ---
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'healthy',
+    timestamp: new Date().toISOString() 
+  });
+});
 
 // --- File Upload Endpoint ---
 app.post('/upload', upload.single('resume'), async (req, res) => {
@@ -27,8 +46,8 @@ app.post('/upload', upload.single('resume'), async (req, res) => {
 
     // Upload to GitHub
     const { data } = await octokit.repos.createOrUpdateFileContents({
-      owner,
-      repo,
+      owner: process.env.GITHUB_OWNER,
+      repo: process.env.GITHUB_REPO,
       path: fileName,
       message: `Added: ${req.file.originalname}`,
       content: fileContent
@@ -40,26 +59,41 @@ app.post('/upload', upload.single('resume'), async (req, res) => {
     console.log(`✅ Uploaded to GitHub: ${fileName}`);
     res.json({ 
       success: true,
-      url: data.content.html_url 
+      url: data.content.html_url,
+      timestamp: new Date().toISOString()
     });
 
   } catch (err) {
     console.error('❌ Upload failed:', err.message);
     res.status(500).json({ 
       success: false,
-      error: err.message 
+      error: err.message,
+      timestamp: new Date().toISOString()
     });
   }
 });
 
-// --- Cron Job (Google Search) ---
-cron.schedule('*/3 * * * *', () => {
-  axios.get('https://www.google.com/search?q=current+time')
-    .then(() => console.log(`🕒 Google searched at ${new Date().toISOString()}`))
-    .catch(err => console.error('❌ Google search failed:', err.message));
+// --- Scheduled Endpoint Ping ---
+cron.schedule('*/2 * * * *', async () => {
+  try {
+    const response = await axios.get(process.env.RENDER_ENDPOINT + '/welcome', {
+      timeout: 5000 // 5 second timeout
+    });
+    
+    console.log(`🌐 Successfully pinged ${process.env.RENDER_ENDPOINT} at ${new Date().toISOString()}`);
+    console.log(`Response status: ${response.status}`);
+  } catch (err) {
+    console.error(`❌ Failed to ping ${process.env.RENDER_ENDPOINT}:`, err.message);
+  }
 });
 
 // Start Server
-app.listen(process.env.PORT, () => {
-  console.log(`Server running on http://localhost:${process.env.PORT}`);
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🔧 Configuration:`);
+  console.log(`- GitHub Owner: ${process.env.GITHUB_OWNER}`);
+  console.log(`- GitHub Repo: ${process.env.GITHUB_REPO}`);
+  console.log(`- Render Endpoint: ${process.env.RENDER_ENDPOINT}`);
+  console.log(`⏱️ Will ping endpoint every 2 minutes`);
 });
