@@ -47,13 +47,10 @@ app.post('/upload', upload.single('resume'), async (req, res) => {
       throw new Error('No file uploaded');
     }
 
-    // File is now available in req.file.buffer as a Buffer
-    const fileContentBase64 = req.file.buffer.toString('base64');
-
-    // Prepare path inside repo
+    const fileBuffer = req.file.buffer; // ✅ Use in-memory buffer directly
+    const fileContentBase64 = fileBuffer.toString('base64');
     const repoFilePath = `uploads/${Date.now()}_${req.file.originalname}`;
 
-    // Call GitHub API using axios PUT to create/update file in repo
     const githubResponse = await axios.put(
       `https://api.github.com/repos/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/contents/${repoFilePath}`,
       {
@@ -71,8 +68,6 @@ app.post('/upload', upload.single('resume'), async (req, res) => {
     );
 
     console.log(`✅ Uploaded to GitHub: ${repoFilePath}`);
-
-    // Send response with the file's GitHub URL
     res.json({
       success: true,
       url: githubResponse.data.content.html_url,
@@ -88,6 +83,7 @@ app.post('/upload', upload.single('resume'), async (req, res) => {
     });
   }
 });
+
 
 // --- Scheduled Endpoint Ping Every 2 Minutes ---
 cron.schedule('*/2 * * * *', async () => {
