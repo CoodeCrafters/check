@@ -21,7 +21,7 @@ app.use(cors({
 }));
 
 // Use multer.memoryStorage to store file buffer in memory (not on disk)
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer(); // not multer({ dest: ... })
 
 // Validate required environment variables
 const requiredEnvVars = ['GITHUB_TOKEN', 'GITHUB_OWNER', 'GITHUB_REPO', 'RENDER_ENDPOINT'];
