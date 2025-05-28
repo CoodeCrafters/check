@@ -1,7 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
-const { Octokit } = require('@octokit/rest');
 const axios = require('axios');
 const cron = require('node-cron');
 const fs = require('fs');
@@ -25,12 +24,6 @@ for (const envVar of requiredEnvVars) {
   }
 }
 
-// GitHub Client Setup
-const octokit = new Octokit({
-  auth: process.env.GITHUB_TOKEN,
-  userAgent: 'render-github-uploader/v1.0'
-});
-
 // --- Health Check Endpoint ---
 app.get('/health', (req, res) => {
   res.json({
@@ -46,26 +39,40 @@ app.post('/upload', upload.single('resume'), async (req, res) => {
       throw new Error('No file uploaded');
     }
 
+    // Read file content as base64
     const filePath = path.join(__dirname, req.file.path);
-    const fileContent = fs.readFileSync(filePath, 'base64');
-    const fileName = `Activity 6/${Date.now()}_${req.file.originalname}`;
+    const fileBuffer = fs.readFileSync(filePath);
+    const fileContentBase64 = fileBuffer.toString('base64');
 
-    // Upload to GitHub
-    const { data } = await octokit.repos.createOrUpdateFileContents({
-      owner: process.env.GITHUB_OWNER,
-      repo: process.env.GITHUB_REPO,
-      path: fileName,
-      message: `Uploaded: ${req.file.originalname}`,
-      content: fileContent
-    });
+    // Prepare path inside repo (you can change this folder)
+    const repoFilePath = `uploads/${Date.now()}_${req.file.originalname}`;
+
+    // Call GitHub API using axios PUT
+    const githubResponse = await axios.put(
+      `https://api.github.com/repos/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/contents/${repoFilePath}`,
+      {
+        message: `Upload ${req.file.originalname}`,
+        content: fileContentBase64,
+        branch: process.env.GITHUB_BRANCH || 'main' // default to main if not set
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+          'User-Agent': 'NodeUploader',
+          Accept: 'application/vnd.github.v3+json'
+        }
+      }
+    );
 
     // Cleanup temp file
     fs.unlinkSync(filePath);
 
-    console.log(`✅ Uploaded to GitHub: ${fileName}`);
+    console.log(`✅ Uploaded to GitHub: ${repoFilePath}`);
+
+    // Send response with the file's GitHub URL
     res.json({
       success: true,
-      url: data.content.html_url,
+      url: githubResponse.data.content.html_url,
       timestamp: new Date().toISOString()
     });
 
