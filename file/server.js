@@ -123,7 +123,7 @@ app.post('/evaluations', express.json(), async (req, res) => {
     }
 
     // Adjust this key based on your JSON schema for evaluator unique ID
-    const newRollNumber = newEvaluatorData.rollNumber || newEvaluatorData.roll_no || null;
+const newRollNumber = newEvaluatorData.rollNo || newEvaluatorData.rollNumber || newEvaluatorData.roll_no || null;
 
     if (!newRollNumber) {
       return res.status(400).json({ success: false, error: 'Evaluator roll number is required' });
