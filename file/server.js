@@ -4,6 +4,8 @@ const multer = require('multer');
 const axios = require('axios');
 const cron = require('node-cron');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 
@@ -22,6 +24,8 @@ app.use(cors({
 
 // Use multer.memoryStorage to store file buffer in memory (not on disk)
 const upload = multer(); // not multer({ dest: ... })
+app.use(express.json()); // To parse JSON bodies
+
 
 // Validate required environment variables
 const requiredEnvVars = ['GITHUB_TOKEN', 'GITHUB_OWNER', 'GITHUB_REPO', 'RENDER_ENDPOINT'];
@@ -107,4 +111,62 @@ app.listen(PORT, () => {
   console.log(`- GitHub Repo: ${process.env.GITHUB_REPO}`);
   console.log(`- Render Endpoint: ${process.env.RENDER_ENDPOINT}`);
   console.log(`⏱️ Will ping /welcome every 2 minutes`);
+});
+
+
+app.post('/evaluations', express.json(), async (req, res) => {
+  try {
+    const newEvaluatorData = req.body;
+
+    if (!newEvaluatorData) {
+      return res.status(400).json({ success: false, error: 'Request body missing' });
+    }
+
+    // Adjust this key based on your JSON schema for evaluator unique ID
+    const newRollNumber = newEvaluatorData.rollNumber || newEvaluatorData.roll_no || null;
+
+    if (!newRollNumber) {
+      return res.status(400).json({ success: false, error: 'Evaluator roll number is required' });
+    }
+
+    const filePath = path.join(__dirname, 'evaluationjson.json');
+
+    let existingData = [];
+
+    if (fs.existsSync(filePath)) {
+      const fileContent = fs.readFileSync(filePath, 'utf8');
+      existingData = fileContent ? JSON.parse(fileContent) : [];
+    }
+
+    // Check for duplicate roll number
+    const duplicate = existingData.find(evaluator => {
+      return (evaluator.rollNumber === newRollNumber || evaluator.roll_no === newRollNumber);
+    });
+
+    if (duplicate) {
+      return res.status(409).json({
+        success: false,
+        error: `Evaluator with roll number '${newRollNumber}' already exists`
+      });
+    }
+
+    // Append new evaluator data
+    existingData.push(newEvaluatorData);
+
+    // Write back updated JSON
+    fs.writeFileSync(filePath, JSON.stringify(existingData, null, 2));
+
+    res.json({
+      success: true,
+      message: 'Evaluator data saved successfully',
+      data: newEvaluatorData
+    });
+
+  } catch (err) {
+    console.error('Error in /evaluations:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
 });
