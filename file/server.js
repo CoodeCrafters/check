@@ -122,26 +122,39 @@ app.post('/evaluations', express.json(), async (req, res) => {
       return res.status(400).json({ success: false, error: 'Request body missing' });
     }
 
-    // Adjust this key based on your JSON schema for evaluator unique ID
-const newRollNumber = newEvaluatorData.rollNo || newEvaluatorData.rollNumber || newEvaluatorData.roll_no || null;
-
+    const newRollNumber = newEvaluatorData.rollNo || newEvaluatorData.rollNumber || newEvaluatorData.roll_no || null;
     if (!newRollNumber) {
       return res.status(400).json({ success: false, error: 'Evaluator roll number is required' });
     }
 
-    const filePath = path.join(__dirname, 'evaluationjson.json');
+    const githubPath = 'evaluationjson.json';
+    const githubApiUrl = `https://api.github.com/repos/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/contents/${githubPath}`;
+    const headers = {
+      Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+      'User-Agent': 'NodeUploader',
+      Accept: 'application/vnd.github.v3+json'
+    };
 
+    // Step 1: Fetch current file from GitHub (to get SHA and existing content)
     let existingData = [];
+    let sha = null;
 
-    if (fs.existsSync(filePath)) {
-      const fileContent = fs.readFileSync(filePath, 'utf8');
-      existingData = fileContent ? JSON.parse(fileContent) : [];
+    try {
+      const { data } = await axios.get(githubApiUrl, { headers });
+      const content = Buffer.from(data.content, 'base64').toString();
+      existingData = content ? JSON.parse(content) : [];
+      sha = data.sha;
+    } catch (err) {
+      // If 404, it means the file does not exist — create it from scratch
+      if (err.response && err.response.status !== 404) {
+        throw err;
+      }
     }
 
-    // Check for duplicate roll number
-    const duplicate = existingData.find(evaluator => {
-      return (evaluator.rollNumber === newRollNumber || evaluator.roll_no === newRollNumber);
-    });
+    // Step 2: Check for duplicate
+    const duplicate = existingData.find(
+      evaluator => evaluator.rollNo === newRollNumber || evaluator.rollNumber === newRollNumber || evaluator.roll_no === newRollNumber
+    );
 
     if (duplicate) {
       return res.status(409).json({
@@ -150,20 +163,29 @@ const newRollNumber = newEvaluatorData.rollNo || newEvaluatorData.rollNumber || 
       });
     }
 
-    // Append new evaluator data
+    // Step 3: Append and upload updated file
     existingData.push(newEvaluatorData);
+    const updatedContent = Buffer.from(JSON.stringify(existingData, null, 2)).toString('base64');
 
-    // Write back updated JSON
-    fs.writeFileSync(filePath, JSON.stringify(existingData, null, 2));
+    const payload = {
+      message: `Add evaluation for ${newRollNumber}`,
+      content: updatedContent,
+      branch: process.env.GITHUB_BRANCH || 'main',
+    };
+
+    if (sha) payload.sha = sha; // required for updating existing files
+
+    const uploadResponse = await axios.put(githubApiUrl, payload, { headers });
 
     res.json({
       success: true,
-      message: 'Evaluator data saved successfully',
+      message: 'Evaluation uploaded to GitHub successfully',
+      githubUrl: uploadResponse.data.content.html_url,
       data: newEvaluatorData
     });
 
   } catch (err) {
-    console.error('Error in /evaluations:', err);
+    console.error('Error in /evaluations:', err.message);
     res.status(500).json({
       success: false,
       error: 'Internal server error'
